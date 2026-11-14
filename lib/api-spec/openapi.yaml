@@ -1,0 +1,232 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+paths:
+  /registration-config:
+    get:
+      operationId: getRegistrationConfig
+      responses:
+        "200":
+          description: Public deadline
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deadline, open]
+                properties:
+                  deadline: {type: string}
+                  open: {type: boolean}
+  /registrations:
+    post:
+      operationId: submitRegistration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RegistrationInput"}
+      responses:
+        "201":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [referenceCode]
+                properties:
+                  referenceCode: {type: string}
+  /admin/session:
+    get:
+      operationId: getAdminSession
+      responses:
+        "200":
+          description: Session
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Session"}
+  /admin/login:
+    post:
+      operationId: adminLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LoginInput"}
+      responses:
+        "200":
+          description: Session
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Session"}
+  /admin/logout:
+    post:
+      operationId: adminLogout
+      responses:
+        "200":
+          description: Logged out
+  /admin/summary:
+    get:
+      operationId: getAdminSummary
+      responses:
+        "200":
+          description: Counts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [registrations, participants, internalTeams, externalTeams, individuals, ideas, needsIdea, needsMembers]
+                properties:
+                  registrations: {type: integer}
+                  participants: {type: integer}
+                  internalTeams: {type: integer}
+                  externalTeams: {type: integer}
+                  individuals: {type: integer}
+                  ideas: {type: integer}
+                  needsIdea: {type: integer}
+                  needsMembers: {type: integer}
+  /admin/registrations:
+    get:
+      operationId: listRegistrations
+      responses:
+        "200":
+          description: Private registrations, frontend filters supported
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Registration"}
+  /admin/registrations/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+    get:
+      operationId: getRegistration
+      responses:
+        "200":
+          description: Details
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Registration"}
+    delete:
+      operationId: deleteRegistration
+      responses:
+        "204":
+          description: Deleted
+  /admin/export/{format}:
+    get:
+      operationId: exportRegistrations
+      parameters:
+        - {name: format, in: path, required: true, schema: {type: string, enum: [xlsx, csv]}}
+      responses:
+        "200":
+          description: Private download
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+components:
+  schemas:
+    Session:
+      type: object
+      required: [authenticated, csrfToken]
+      properties:
+        authenticated: {type: boolean}
+        csrfToken: {type: string}
+    LoginInput:
+      type: object
+      required: [password]
+      properties:
+        password: {type: string}
+    Participant:
+      type: object
+      required: [fullNameAr, fullNameEn, college, academicYear, phone, telegramUsername, courses]
+      properties:
+        fullNameAr: {type: string}
+        fullNameEn: {type: string}
+        college: {type: string}
+        collegeOther: {type: string}
+        academicYear: {type: string}
+        phone: {type: string}
+        telegramUsername: {type: string}
+        courses:
+          type: array
+          items: {type: string}
+        courseOther: {type: string}
+    TeamInput:
+      type: object
+      required: [name, totalMembers, members, needs]
+      properties:
+        name: {type: string}
+        totalMembers: {type: integer, minimum: 2, maximum: 6}
+        members:
+          type: array
+          items: {$ref: "#/components/schemas/Participant"}
+        needs:
+          type: array
+          items: {type: string}
+    Preferences:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          items: {type: string}
+        friendName: {type: string}
+    IdeaInput:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [HAS_IDEA, NEEDS_IDEA]}
+        title: {type: string}
+        projectType: {type: string, enum: [HARDWARE, AI, HYBRID]}
+        description: {type: string}
+        expectedTechnologies: {type: string}
+    RegistrationInput:
+      type: object
+      required: [affiliationType, participationType, applicant, idea, termsWorkshopAccepted, termsEquipmentAccepted]
+      properties:
+        affiliationType: {type: string, enum: [INTERNAL, EXTERNAL]}
+        participationType: {type: string, enum: [TEAM, INDIVIDUAL]}
+        externalOrganizationName: {type: string}
+        applicant: {$ref: "#/components/schemas/Participant"}
+        team: {$ref: "#/components/schemas/TeamInput"}
+        preferences: {$ref: "#/components/schemas/Preferences"}
+        idea: {$ref: "#/components/schemas/IdeaInput"}
+        termsWorkshopAccepted: {type: boolean}
+        termsEquipmentAccepted: {type: boolean}
+    Registration:
+      allOf:
+        - {$ref: "#/components/schemas/RegistrationInput"}
+        - type: object
+          required: [id, referenceCode, createdAt]
+          properties:
+            id: {type: integer}
+            referenceCode: {type: string}
+            createdAt: {type: string}
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+

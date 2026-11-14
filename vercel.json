@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm run vercel:build",
+  "regions": [
+    "fra1"
+  ],
+  "rewrites": [
+    {
+      "source": "/register",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin-hmk",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin-hmk/:path*",
+      "destination": "/index.html"
+    }
+  ]
+}

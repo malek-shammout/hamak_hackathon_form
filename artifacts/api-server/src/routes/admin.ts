@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
-import { AdminLoginBody, GetRegistrationParams, DeleteRegistrationParams, ListRegistrationsResponse, GetRegistrationResponse, ExportRegistrationsParams } from "@workspace/api-zod";
+import { AdminLoginBody, UpdateRegistrationSettingsBody, GetRegistrationParams, DeleteRegistrationParams, ListRegistrationsResponse, GetRegistrationResponse, ExportRegistrationsParams } from "@workspace/api-zod";
 import { csrfToken, requireCsrf, requireAdmin, safeEqual, loginLimiter, sessionMiddleware } from "../middlewares/security";
 import { readRegistrations, removeRegistration, summarize } from "../services/registrations";
 import { csvExport, excelExport } from "../services/exports";
+import { getRegistrationState, updateRegistrationSettings } from "../services/settings";
 
 const router: IRouter = Router();
 router.use("/admin", (_req, res, next) => {
@@ -61,5 +62,15 @@ router.get("/admin/export/:format", async (req, res): Promise<void> => {
   } else {
     res.attachment("hmk-registrations.xlsx").type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").send(Buffer.from(await excelExport(rows)));
   }
+});
+router.get("/admin/settings", async (_req, res): Promise<void> => {
+  res.json(await getRegistrationState());
+});
+router.put("/admin/settings", requireCsrf, async (req, res): Promise<void> => {
+  const input = UpdateRegistrationSettingsBody.safeParse(req.body);
+  const deadlineMs = input.success ? Date.parse(input.data.deadline) : NaN;
+  if (!input.success || Number.isNaN(deadlineMs)) { res.status(400).json({ error: "إعدادات غير صالحة" }); return; }
+  if (input.data.closedMessage.length > 600) { res.status(400).json({ error: "رسالة الإغلاق أطول من 600 حرف" }); return; }
+  res.json(await updateRegistrationSettings(input.data));
 });
 export default router;

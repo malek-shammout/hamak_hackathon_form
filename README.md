@@ -3,10 +3,12 @@
 منصة عربية RTL للتعريف والتسجيل في هاكاثون الروبوتيك والذكاء الصنعي — نادي الهمك، جامعة دمشق.
 تدعم الفرق الداخلية والخارجية والأفراد، وتُبقي بيانات المشاركين خاصة بالمنظّمين.
 
+> **الإعداد والنشر:** راجع [docs/SETUP-SUPABASE-VERCEL.md](docs/SETUP-SUPABASE-VERCEL.md) لربط Supabase وVercel خطوة بخطوة.
+
 ## التقنيات والبنية
 
 - React / TypeScript / Vite / Tailwind، React Router، React Hook Form، Zod، Motion، Lucide.
-- Express / TypeScript، PostgreSQL على Neon للإنتاج، Drizzle ORM.
+- Express / TypeScript، PostgreSQL على Supabase للإنتاج، Drizzle ORM.
 - جلسات مخزّنة في PostgreSQL، ExcelJS للتصدير.
 - `artifacts/hmk-hackathon`: الواجهة العامة والتسجيل والإدارة.
 - `artifacts/api-server/src/routes`: وحدات HTTP.
@@ -45,8 +47,8 @@ PORT=5173 BASE_PATH=/ pnpm --filter @workspace/hmk-hackathon run dev
 
 | المتغير | الغرض |
 |---|---|
-| `DATABASE_URL` | رابط Neon المجمّع (Pooled) لتشغيل التطبيق |
-| `DATABASE_URL_UNPOOLED` | رابط Neon المباشر لعمليات Drizzle Kit |
+| `DATABASE_URL` | رابط Supabase من نوع Transaction pooler (منفذ 6543) لتشغيل التطبيق |
+| `DATABASE_URL_UNPOOLED` | رابط Supabase من نوع Session pooler (منفذ 5432) لعمليات Drizzle Kit فقط |
 | `ADMIN_PASSWORD` | كلمة مرور قوية مشتركة للمنظّمين، بلا قيمة افتراضية |
 | `SESSION_SECRET` | قيمة عشوائية قوية لتوقيع الجلسات |
 
@@ -57,6 +59,8 @@ PORT=5173 BASE_PATH=/ pnpm --filter @workspace/hmk-hackathon run dev
 - `/`: تعريف الهاكاثون ودليله والعد التنازلي.
 - `/register`: التسجيل المشروط متعدد الخطوات ثم شاشة رقم الطلب.
 - `/admin-hmk`: دخول المنظّمين ولوحة البيانات. لا يوجد رابط عام إليها.
+- `/admin-hmk/analytics`: التحليلات والرسوم البيانية.
+- `/admin-hmk/settings`: فتح/إغلاق التسجيل، تعديل الموعد، ورسالة الإغلاق.
 
 الإدارة تتيح الاستعراض والبحث والفلترة والتصدير وحذف الطلب كاملاً فقط.
 لا توجد واجهات تعديل، حالات قبول/رفض، ملاحظات إدارية أو توزيع تلقائي للفرق.
@@ -73,6 +77,8 @@ PORT=5173 BASE_PATH=/ pnpm --filter @workspace/hmk-hackathon run dev
 | `GET /admin/session` | جلسة المنظّم ورمز CSRF؛ مسموح قبل الدخول |
 | `POST /admin/login` | كلمة مرور عبر الخادم؛ يتطلب CSRF |
 | `POST /admin/logout` | إتلاف الجلسة؛ يتطلب الدخول وCSRF |
+| `GET /admin/settings` | إعدادات التسجيل: الوضع (AUTO/OPEN/CLOSED)، الموعد، رسالة الإغلاق |
+| `PUT /admin/settings` | حفظ إعدادات التسجيل وتطبيقها فوراً؛ يتطلب CSRF |
 | `GET /admin/summary` | إحصائيات الطلبات والأشخاص والفرق والأفكار |
 | `GET /admin/registrations` | الطلبات الكاملة للمنظّم، والفلترة محلياً داخل لوحة الإدارة |
 | `GET /admin/registrations/:id` | تفاصيل طلب |
@@ -112,20 +118,20 @@ erDiagram
 
 ## تحديث المخطط
 
-عدّل تعريفات Drizzle ثم ولّد ملف migration تاريخي وطبّق التغيير باستخدام اتصال مباشر (`DATABASE_URL_UNPOOLED` في Neon):
+عدّل تعريفات Drizzle ثم ولّد ملف migration تاريخي وطبّق التغيير باستخدام اتصال مباشر (`DATABASE_URL_UNPOOLED` في Supabase):
 
 ```sh
 pnpm --filter @workspace/db exec drizzle-kit generate --config ./drizzle.config.ts
 pnpm --filter @workspace/db run push
 ```
 
-لا تشغّل تغييرات المخطط عند بدء الخادم ولا داخل بناء الإنتاج. راجع أي تحذيرات حذف أو إعادة تسمية قبل تطبيق التغيير على قاعدة Neon الإنتاجية. تحتفظ ملفات `lib/db/drizzle` بتاريخ SQL؛ `push` هو مسار تطبيق المخطط الحالي في هذا المشروع.
+لا تشغّل تغييرات المخطط عند بدء الخادم ولا داخل بناء الإنتاج. راجع أي تحذيرات حذف أو إعادة تسمية قبل تطبيق التغيير على قاعدة Supabase الإنتاجية. تحتفظ ملفات `lib/db/drizzle` بتاريخ SQL؛ `push` هو مسار تطبيق المخطط الحالي في هذا المشروع.
 
 ## النشر على Vercel
 
-تم تجهيز المشروع للنشر على Vercel مع Express Function وواجهة Vite ثابتة وقاعدة Neon PostgreSQL. اتبع الدليل التفصيلي: [docs/vercel-deployment-ar.md](docs/vercel-deployment-ar.md).
+يولّد أمر البناء مخرجات Vercel Build Output API مباشرة في `.vercel/output` (واجهة ثابتة + دالة Express على `/api/*`)، ولا يعتمد على الاكتشاف التلقائي. الدليل: [docs/SETUP-SUPABASE-VERCEL.md](docs/SETUP-SUPABASE-VERCEL.md).
 
-أمر البناء الخاص بـ Vercel هو `pnpm run vercel:build`. يجب إنشاء جداول Neon مرة واحدة باستخدام `DATABASE_URL_UNPOOLED` قبل تشغيل الموقع. لا تُشغّل migrations تلقائياً أثناء كل Deployment.
+أمر البناء الخاص بـ Vercel هو `pnpm run vercel:build`. أنشئ الجداول مرة واحدة بتشغيل `supabase/setup.sql` في SQL Editor الخاص بـ Supabase. لا تُشغّل migrations تلقائياً أثناء كل Deployment.
 
 ## الخصوصية والأمان
 
@@ -143,9 +149,9 @@ pnpm --filter @workspace/db run push
 
 ## النسخ الاحتياطي والاسترجاع
 
-استخدم إمكانيات النسخ الاحتياطي والاسترجاع التي توفرها خطة Neon المفعّلة. تحقق من نافذة الاحتفاظ وإعدادات الاسترجاع في لوحة Neon قبل استقبال التسجيلات. ملفات Excel/CSV تصدير للبيانات وليست بديلاً عن نسخة احتياطية كاملة لقاعدة البيانات.
+استخدم إمكانيات النسخ الاحتياطي والاسترجاع التي توفرها خطة Supabase المفعّلة. تحقق من نافذة الاحتفاظ وإعدادات الاسترجاع في لوحة Supabase قبل استقبال التسجيلات. ملفات Excel/CSV تصدير للبيانات وليست بديلاً عن نسخة احتياطية كاملة لقاعدة البيانات.
 
-مراجع: راجع إعدادات النسخ الاحتياطي والاسترجاع المتاحة فعلياً ضمن خطة Neon التي تستخدمها.
+مراجع: راجع إعدادات النسخ الاحتياطي والاسترجاع المتاحة فعلياً ضمن خطة Supabase التي تستخدمها.
 
 ## التحقق
 

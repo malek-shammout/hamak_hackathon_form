@@ -20,4 +20,4 @@
 export * from "./registrations";
 export * from "./participants";
 export * from "./teams";
-export * from "./security";
+export * from "./security";export * from "./settings";

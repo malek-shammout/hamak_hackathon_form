@@ -17,21 +17,21 @@ export const participants = pgTable("participants", {
   check("valid_role", sql`${t.role} IN ('LEADER','MEMBER','INDIVIDUAL')`),
   check("valid_phone", sql`${t.phone} ~ '^09[0-9]{8}$'`),
   uniqueIndex("one_applicant_per_registration").on(t.registrationId).where(sql`${t.role} IN ('LEADER','INDIVIDUAL')`),
-]);
+]).enableRLS();
 export const participantCourses = pgTable("participant_courses", {
   id: serial("id").primaryKey(),
   participantId: integer("participant_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
   course: text("course").notNull(),
   otherName: text("other_name"),
-}, t => [uniqueIndex("unique_participant_course").on(t.participantId, t.course)]);
+}, t => [uniqueIndex("unique_participant_course").on(t.participantId, t.course)]).enableRLS();
 
 export const individualPreferences = pgTable("individual_preferences", {
   id: serial("id").primaryKey(),
   registrationId: integer("registration_id").notNull().unique().references(() => registrations.id, { onDelete: "cascade" }),
   friendName: text("friend_name"),
-});
+}).enableRLS();
 export const individualRoles = pgTable("individual_roles", {
   id: serial("id").primaryKey(),
   preferenceId: integer("preference_id").notNull().references(() => individualPreferences.id, { onDelete: "cascade" }),
   role: text("role").notNull(),
-}, t => [uniqueIndex("unique_individual_role").on(t.preferenceId, t.role)]);
+}, t => [uniqueIndex("unique_individual_role").on(t.preferenceId, t.role)]).enableRLS();

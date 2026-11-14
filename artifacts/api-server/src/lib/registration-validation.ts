@@ -2,8 +2,8 @@ import { z } from "zod";
 import { SubmitRegistrationBody } from "@workspace/api-zod";
 import { COLLEGES, YEARS, COURSES, NEEDS, ROLES } from "./options";
 
-export const DEADLINE = "2026-12-01T23:59:59+03:00";
-export const registrationOpen = (now = Date.now()) => now <= Date.parse(DEADLINE);
+// Default deadline used until an organizer saves settings from the dashboard.
+export const DEFAULT_DEADLINE = "2026-12-01T23:59:59+03:00";
 export const NO_COURSES = "لم أحضر سابقاً";
 export const OTHER_COURSE = "دورة أخرى";
 export const COMPLETE_TEAM = "فريقنا مكتمل ومتوازن تقنياً";

@@ -10,10 +10,9 @@ import {
 import { useSubmitRegistration } from "@workspace/api-client-react";
 import { PublicHeader } from "@/components/public-chrome";
 import { ClubLogo, HackLogo, usePageMeta } from "@/components/brand";
-import { Countdown } from "@/components/countdown";
 import { ChoiceCard, ChipGroup, CheckRow, Field, SelectInput, TextArea, TextInput } from "@/components/form-bits";
 import { ParticipantFields, getErr } from "@/components/participant-fields";
-import { useRegistrationWindow } from "@/pages/home";
+import { useRegistrationWindow } from "@/hooks/use-registration-window";
 import { regSchema, defaultValues, emptyParticipant, toPayload, type RegForm } from "@/lib/registration-schema";
 import {
   COURSE_OUTSIDE, NEEDS, NEED_COMPLETE, PROJECT_TYPES, ROLES, AFFILIATION_LABEL, PARTICIPATION_LABEL, IDEA_LABEL,
@@ -60,7 +59,8 @@ const Card = ({ children, className }: { children: ReactNode; className?: string
 
 export default function Register() {
   usePageMeta("التسجيل | هاكاثون الروبوتيك والذكاء الصنعي - نادي الهمك", "سجّل فريقك أو سجّل كمشارك منفرد في هاكاثون الروبوتيك والذكاء الصنعي - نادي الهمك، جامعة دمشق.");
-  const { open, deadline, loading } = useRegistrationWindow();
+  const win = useRegistrationWindow();
+  const { open, loading } = win;
   const [done, setDone] = useState<string | null>(null);
 
   return (
@@ -74,7 +74,7 @@ export default function Register() {
           <div className="h-[420px] animate-pulse rounded-2xl bg-muted" />
         </div>
       ) : !open ? (
-        <ClosedScreen deadline={deadline} />
+        <ClosedScreen win={win} />
       ) : (
         <Wizard onDone={setDone} />
       )}
@@ -82,16 +82,22 @@ export default function Register() {
   );
 }
 
-function ClosedScreen({ deadline }: { deadline: string }) {
+function ClosedScreen({ win }: { win: ReturnType<typeof useRegistrationWindow> }) {
   return (
     <div className="px-4 py-16">
       <div className="relative mx-auto max-w-2xl overflow-hidden rounded-3xl bg-ink p-10 text-center text-ink-foreground">
         <div className="pixel-grid absolute inset-0" />
         <div className="relative">
           <Lock className="mx-auto h-10 w-10 text-primary" />
-          <h1 className="mt-6 text-3xl font-black" data-testid="text-registration-closed">انتهى التسجيل</h1>
-          <p className="mt-3 leading-8 text-white/65">أُغلق باب التسجيل في 1 ديسمبر 2026 الساعة 23:59:59 بتوقيت دمشق. شكراً لاهتمامك.</p>
-          <div className="mt-8 flex justify-center"><Countdown deadline={deadline} compact /></div>
+          <h1 className="mt-6 text-3xl font-black" data-testid="text-registration-closed">{win.status}</h1>
+          <p className="mt-3 whitespace-pre-line leading-8 text-white/65">
+            {win.unavailable ? "لم نتمكن من الاتصال بخادم التسجيل. تحقق من اتصالك ثم أعد المحاولة." : win.closedText}
+          </p>
+          {win.unavailable && (
+            <button onClick={() => win.retry()} className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground" data-testid="button-retry-config">
+              إعادة المحاولة
+            </button>
+          )}
           <Link to="/" className="mt-8 inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 px-5 text-sm hover:bg-white/5" data-testid="link-back-home">
             العودة إلى الصفحة الرئيسية
           </Link>

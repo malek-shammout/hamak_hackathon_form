@@ -16,4 +16,4 @@ export const registrations = pgTable("registrations", {
   check("valid_participation", sql`${t.participationType} IN ('TEAM','INDIVIDUAL')`),
   check("external_is_team", sql`${t.affiliationType} <> 'EXTERNAL' OR (${t.participationType} = 'TEAM' AND length(trim(${t.externalOrganizationName})) > 0 AND ${t.externalOrganizationName} IS NOT NULL)`),
   check("terms_accepted", sql`${t.termsWorkshopAccepted} AND ${t.termsEquipmentAccepted}`),
-]);
+]).enableRLS();

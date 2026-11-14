@@ -4,9 +4,9 @@ export const sessions = pgTable("hmk_sessions", {
   sid: text("sid").primaryKey(),
   sess: json("sess").notNull(),
   expire: timestamp("expire", { precision: 6 }).notNull(),
-}, t => [index("session_expiry").on(t.expire)]);
+}, t => [index("session_expiry").on(t.expire)]).enableRLS();
 export const rateLimits = pgTable("hmk_rate_limits", {
   key: text("key").primaryKey(),
   hits: integer("hits").notNull(),
   resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
-});
+}).enableRLS();

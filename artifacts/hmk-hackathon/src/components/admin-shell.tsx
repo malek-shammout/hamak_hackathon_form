@@ -4,10 +4,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2, LogOut, ShieldCheck, Download, FileSpreadsheet, LayoutGrid, ListChecks, UserRound, AlertTriangle, RotateCw } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2, LogOut, ShieldCheck, Download, FileSpreadsheet, LayoutGrid, ListChecks, UserRound, AlertTriangle, RotateCw, BarChart3, SlidersHorizontal } from "lucide-react";
 import { ClubLogo, HackLogo, ThemeToggle, usePageMeta } from "@/components/brand";
 import { Field } from "@/components/form-bits";
-import { useAdminSession, useLogin, useLogout, apiErrorMessage } from "@/hooks/use-admin";
+import { useAdminSession, useLogin, useLogout, useRegSettings, apiErrorMessage } from "@/hooks/use-admin";
 import { cn } from "@/lib/utils";
 
 export function AdminGate({ children }: { children: ReactNode }) {
@@ -130,7 +130,23 @@ const NAV = [
   { to: "/admin-hmk", label: "نظرة عامة", icon: LayoutGrid, end: true },
   { to: "/admin-hmk/registrations", label: "التسجيلات", icon: ListChecks, end: false },
   { to: "/admin-hmk/individuals", label: "المشاركون المنفردون", icon: UserRound, end: false },
+  { to: "/admin-hmk/analytics", label: "التحليلات", icon: BarChart3, end: false },
+  { to: "/admin-hmk/settings", label: "التحكم بالتسجيل", icon: SlidersHorizontal, end: false },
 ];
+
+/** Live open/closed chip in the header; links to the controls page. */
+function RegistrationStatusChip() {
+  const s = useRegSettings(true);
+  if (!s.data) return null;
+  const open = s.data.open;
+  return (
+    <Link to="/admin-hmk/settings" data-testid="chip-registration-status"
+      className={cn("hidden h-10 items-center gap-2 rounded-xl border px-3 text-xs font-bold sm:inline-flex", open ? "border-success/30 text-success" : "border-primary/30 text-primary")}>
+      <span className={cn("h-2 w-2 rounded-full", open ? "bg-success" : "bg-primary")} />
+      {open ? "التسجيل مفتوح" : "التسجيل مغلق"}
+    </Link>
+  );
+}
 
 export function AdminLayout({ children, title, crumb }: { children: ReactNode; title: string; crumb?: ReactNode }) {
   const logout = useLogout();
@@ -145,6 +161,7 @@ export function AdminLayout({ children, title, crumb }: { children: ReactNode; t
             <span className="rounded-md bg-accent px-2 py-1 text-[11px] font-bold text-accent-foreground">لوحة المنظمين</span>
           </Link>
           <div className="flex items-center gap-2">
+            <RegistrationStatusChip />
             <ExportMenu />
             <ThemeToggle />
             <button onClick={() => logout.mutate()} disabled={logout.isPending} className="inline-flex h-10 items-center gap-2 rounded-xl border bg-card px-3 text-sm hover:border-primary/40 hover:text-primary" data-testid="button-admin-logout">

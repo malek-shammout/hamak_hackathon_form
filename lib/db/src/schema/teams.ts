@@ -8,12 +8,12 @@ export const teams = pgTable("teams", {
   name: text("team_name").notNull(),
   totalMembers: integer("total_members").notNull(),
   completionStatus: text("completion_status").notNull(),
-}, t => [check("team_size", sql`${t.totalMembers} BETWEEN 2 AND 6`)]);
+}, t => [check("team_size", sql`${t.totalMembers} BETWEEN 2 AND 6`)]).enableRLS();
 export const teamNeeds = pgTable("team_needs", {
   id: serial("id").primaryKey(),
   teamId: integer("team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
   need: text("need").notNull(),
-}, t => [uniqueIndex("unique_team_need").on(t.teamId, t.need)]);
+}, t => [uniqueIndex("unique_team_need").on(t.teamId, t.need)]).enableRLS();
 export const projectIdeas = pgTable("project_ideas", {
   id: serial("id").primaryKey(),
   registrationId: integer("registration_id").notNull().unique().references(() => registrations.id, { onDelete: "cascade" }),
@@ -30,4 +30,4 @@ export const projectIdeas = pgTable("project_ideas", {
     ${t.description} IS NOT NULL AND cardinality(regexp_split_to_array(trim(${t.description}), '\\s+')) BETWEEN 50 AND 300 AND
     ${t.expectedTechnologies} IS NOT NULL AND length(trim(${t.expectedTechnologies})) > 0
   )`),
-]);
+]).enableRLS();

@@ -1,3 +1,6 @@
+import {
+  useGetRegistrationSettings, useUpdateRegistrationSettings, getGetRegistrationSettingsQueryKey, getGetRegistrationConfigQueryKey,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetAdminSession, useAdminLogin, useAdminLogout, useDeleteRegistration, useGetAdminSummary, useListRegistrations, useGetRegistration,
@@ -91,3 +94,25 @@ export const apiErrorMessage = (err: unknown, fallback: string) => {
   const e = err as { data?: { error?: string } | null } | null;
   return e?.data?.error ?? fallback;
 };
+
+/* ---------------- registration settings ---------------- */
+
+export function useRegSettings(enabled: boolean) {
+  return useGetRegistrationSettings({
+    query: { enabled, queryKey: getGetRegistrationSettingsQueryKey(), refetchInterval: 60_000 },
+    request: { credentials: "same-origin" },
+  });
+}
+export function useSaveRegSettings() {
+  const qc = useQueryClient();
+  const session = useAdminSession();
+  return useUpdateRegistrationSettings({
+    request: reqOpts(session.data?.csrfToken ?? csrfOf(qc)),
+    mutation: {
+      onSuccess: (saved) => {
+        qc.setQueryData(getGetRegistrationSettingsQueryKey(), saved);
+        qc.invalidateQueries({ queryKey: getGetRegistrationConfigQueryKey() });
+      },
+    },
+  });
+}

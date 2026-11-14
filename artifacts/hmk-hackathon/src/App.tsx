@@ -10,6 +10,8 @@ const Register = lazy(() => import("@/pages/register"));
 const AdminOverview = lazy(() => import("@/pages/admin").then((m) => ({ default: m.AdminOverview })));
 const AdminRegistrations = lazy(() => import("@/pages/admin").then((m) => ({ default: m.AdminRegistrations })));
 const AdminIndividuals = lazy(() => import("@/pages/admin").then((m) => ({ default: m.AdminIndividuals })));
+const AdminAnalytics = lazy(() => import("@/pages/admin-analytics"));
+const AdminSettings = lazy(() => import("@/pages/admin-settings"));
 const AdminRegistrationDetail = lazy(() => import("@/pages/admin").then((m) => ({ default: m.AdminRegistrationDetail })));
 
 const queryClient = new QueryClient({
@@ -60,6 +62,8 @@ function App() {
                   <Route path="/admin-hmk/registrations" element={<AdminRegistrations />} />
                   <Route path="/admin-hmk/registrations/:id" element={<AdminRegistrationDetail />} />
                   <Route path="/admin-hmk/individuals" element={<AdminIndividuals />} />
+                  <Route path="/admin-hmk/analytics" element={<AdminAnalytics />} />
+                  <Route path="/admin-hmk/settings" element={<AdminSettings />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
               </Suspense>

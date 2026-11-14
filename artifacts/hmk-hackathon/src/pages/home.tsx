@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Users, User, Building2, Cpu, BrainCircuit, Bot, Lock, Sparkles, Trophy } from "lucide-react";
-import { useGetRegistrationConfig } from "@workspace/api-client-react";
 import { ClubLogo, HackLogo, Eyebrow, PixelBlocks, usePageMeta } from "@/components/brand";
-import { Countdown, useCountdown } from "@/components/countdown";
+import { Countdown } from "@/components/countdown";
+import { useRegistrationWindow } from "@/hooks/use-registration-window";
 import { GuideTabs } from "@/components/guide";
 import { PublicHeader, PublicFooter, GuideDialogButton } from "@/components/public-chrome";
-import { DEADLINE_ISO, GUIDE } from "@/lib/constants";
+import { GUIDE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const reveal = {
@@ -16,15 +16,9 @@ const reveal = {
   transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
 };
 
-export function useRegistrationWindow() {
-  const cfg = useGetRegistrationConfig();
-  const deadline = cfg.data?.deadline ?? DEADLINE_ISO;
-  const cd = useCountdown(deadline);
-  const open = !cd.expired && (cfg.data ? cfg.data.open : true);
-  return { deadline, open, loading: cfg.isLoading };
-}
+export { useRegistrationWindow };
 
-function RegisterCta({ open, className }: { open: boolean; className?: string }) {
+function RegisterCta({ open, label = "انتهى التسجيل", className }: { open: boolean; label?: string; className?: string }) {
   if (!open)
     return (
       <span
@@ -32,7 +26,7 @@ function RegisterCta({ open, className }: { open: boolean; className?: string })
         data-testid="status-registration-closed"
         className={cn("inline-flex h-12 cursor-not-allowed items-center gap-2 rounded-xl bg-white/10 px-6 text-sm font-bold text-white/60", className)}
       >
-        <Lock className="h-4 w-4" /> انتهى التسجيل
+        <Lock className="h-4 w-4" /> {label}
       </span>
     );
   return (
@@ -57,7 +51,7 @@ export default function Home() {
     "هاكاثون الروبوتيك والذكاء الصنعي | نادي الهمك · جامعة دمشق",
     "ابنِ مشروعك. اختر مجالك. نافس على الأفضل. المنصة الرسمية للتعريف والتسجيل في هاكاثون نادي الهمك للذكاء الصنعي والروبوت.",
   );
-  const { deadline, open } = useRegistrationWindow();
+  const { deadline, deadlineLabel, open, status, showCountdown, closedText } = useRegistrationWindow();
 
   return (
     <div className="grain min-h-[100dvh] bg-background">
@@ -76,7 +70,7 @@ export default function Home() {
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs text-white/75">
                 <span className={cn("h-2 w-2 rounded-full", open ? "bg-emerald-400" : "bg-white/40")} />
-                {open ? "التسجيل مفتوح الآن" : "انتهى التسجيل"} · نادي الهمك · جامعة دمشق
+                {status} · نادي الهمك · جامعة دمشق
               </motion.div>
 
               <motion.h1
@@ -98,7 +92,7 @@ export default function Home() {
 
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
                 className="mt-9 flex flex-wrap items-center gap-3">
-                <RegisterCta open={open} />
+                <RegisterCta open={open} label={status} />
                 <GuideDialogButton variant="solid" />
               </motion.div>
             </div>
@@ -119,13 +113,20 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="w-full max-w-md">
-                <div className="mb-3 flex items-center justify-between text-xs text-white/60">
-                  <span className="font-bold text-white/85">{open ? "ينتهي التسجيل خلال" : "انتهى التسجيل"}</span>
-                  <span>1 ديسمبر 2026 · 23:59:59 بتوقيت دمشق</span>
+              {showCountdown ? (
+                <div className="w-full max-w-md">
+                  <div className="mb-3 flex items-center justify-between text-xs text-white/60">
+                    <span className="font-bold text-white/85">{open ? "ينتهي التسجيل خلال" : status}</span>
+                    <span>{deadlineLabel}</span>
+                  </div>
+                  <Countdown deadline={deadline} className="justify-between" />
                 </div>
-                <Countdown deadline={deadline} className="justify-between" />
-              </div>
+              ) : (
+                <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-sm leading-7 text-white/75" data-testid="text-registration-state">
+                  <span className="font-bold text-white">{status}</span>
+                  {!open && <span className="block text-white/60">{closedText}</span>}
+                </div>
+              )}
             </motion.div>
           </div>
 
@@ -289,8 +290,8 @@ export default function Home() {
               أفكارك تبدأ <span className="text-primary">من هنا.</span>
             </h2>
             <p className="mx-auto mt-5 max-w-lg leading-8 text-white/65">التسجيل يأخذ دقائق. جهّز بيانات فريقك، وفكرتك إن وجدت.</p>
-            <div className="mt-9 flex justify-center"><Countdown deadline={deadline} compact /></div>
-            <div className="mt-9 flex justify-center"><RegisterCta open={open} /></div>
+            {showCountdown && <div className="mt-9 flex justify-center"><Countdown deadline={deadline} compact /></div>}
+            <div className="mt-9 flex justify-center"><RegisterCta open={open} label={status} /></div>
           </div>
         </motion.div>
       </section>

@@ -4,11 +4,13 @@ import {
   db, registrations, participants, participantCourses, teams, teamNeeds,
   individualPreferences, individualRoles, projectIdeas,
 } from "@workspace/db";
-import { COMPLETE_TEAM, registrationOpen, type RegistrationData } from "../lib/registration-validation";
+import { COMPLETE_TEAM, type RegistrationData } from "../lib/registration-validation";
+import { getRegistrationState } from "./settings";
 
 export async function saveRegistration(input: RegistrationData) {
   return db.transaction(async tx => {
-    if (!registrationOpen()) throw new Error("REGISTRATION_CLOSED");
+    // Re-check inside the transaction so a close from the dashboard takes effect immediately.
+    if (!(await getRegistrationState(tx)).open) throw new Error("REGISTRATION_CLOSED");
     const referenceCode = `HMK-${randomBytes(8).toString("hex").toUpperCase()}`;
     const [registration] = await tx.insert(registrations).values({
       referenceCode,

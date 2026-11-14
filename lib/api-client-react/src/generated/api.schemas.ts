@@ -5,6 +5,30 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type RegistrationMode = typeof RegistrationMode[keyof typeof RegistrationMode];
+
+
+export const RegistrationMode = {
+  AUTO: 'AUTO',
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+} as const;
+
+export interface RegistrationSettingsInput {
+  mode: RegistrationMode;
+  deadline: string;
+  closedMessage: string;
+}
+
+export interface RegistrationSettings {
+  mode: RegistrationMode;
+  deadline: string;
+  closedMessage: string;
+  open: boolean;
+  /** @nullable */
+  updatedAt: string | null;
+}
+
 export interface Session {
   authenticated: boolean;
   csrfToken: string;
@@ -108,6 +132,8 @@ export interface HealthStatus {
 export type GetRegistrationConfig200 = {
   deadline: string;
   open: boolean;
+  mode: RegistrationMode;
+  closedMessage: string;
 };
 
 export type SubmitRegistration201 = {

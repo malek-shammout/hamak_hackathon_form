@@ -5,8 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { RegistrationMode } from './registrationMode';
 
 export type GetRegistrationConfig200 = {
   deadline: string;
   open: boolean;
+  mode: RegistrationMode;
+  closedMessage: string;
 };

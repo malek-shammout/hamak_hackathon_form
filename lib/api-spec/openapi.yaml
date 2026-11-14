@@ -16,15 +16,17 @@ paths:
       operationId: getRegistrationConfig
       responses:
         "200":
-          description: Public deadline
+          description: Public registration window (no participant data)
           content:
             application/json:
               schema:
                 type: object
-                required: [deadline, open]
+                required: [deadline, open, mode, closedMessage]
                 properties:
                   deadline: {type: string}
                   open: {type: boolean}
+                  mode: {$ref: "#/components/schemas/RegistrationMode"}
+                  closedMessage: {type: string}
   /registrations:
     post:
       operationId: submitRegistration
@@ -92,6 +94,28 @@ paths:
                   ideas: {type: integer}
                   needsIdea: {type: integer}
                   needsMembers: {type: integer}
+  /admin/settings:
+    get:
+      operationId: getRegistrationSettings
+      responses:
+        "200":
+          description: Organizer-controlled registration settings
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RegistrationSettings"}
+    put:
+      operationId: updateRegistrationSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RegistrationSettingsInput"}
+      responses:
+        "200":
+          description: Saved settings
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RegistrationSettings"}
   /admin/registrations:
     get:
       operationId: listRegistrations
@@ -145,6 +169,25 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 components:
   schemas:
+    RegistrationMode:
+      type: string
+      enum: [AUTO, OPEN, CLOSED]
+    RegistrationSettingsInput:
+      type: object
+      required: [mode, deadline, closedMessage]
+      properties:
+        mode: {$ref: "#/components/schemas/RegistrationMode"}
+        deadline: {type: string}
+        closedMessage: {type: string}
+    RegistrationSettings:
+      type: object
+      required: [mode, deadline, closedMessage, open, updatedAt]
+      properties:
+        mode: {$ref: "#/components/schemas/RegistrationMode"}
+        deadline: {type: string}
+        closedMessage: {type: string}
+        open: {type: boolean}
+        updatedAt: {type: [string, "null"]}
     Session:
       type: object
       required: [authenticated, csrfToken]

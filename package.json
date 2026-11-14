@@ -7,7 +7,7 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "vercel:build": "pnpm run typecheck && pnpm --filter @workspace/hmk-hackathon run build && node scripts/prepare-vercel.mjs"
+    "vercel:build": "pnpm run typecheck && pnpm --filter @workspace/hmk-hackathon run build && pnpm --filter @workspace/api-server run build:vercel"
   },
   "private": true,
   "dependencies": {

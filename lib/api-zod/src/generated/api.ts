@@ -10,7 +10,9 @@ import * as zod from 'zod';
 
 export const GetRegistrationConfigResponse = zod.object({
   "deadline": zod.string(),
-  "open": zod.boolean()
+  "open": zod.boolean(),
+  "mode": zod.enum(['AUTO', 'OPEN', 'CLOSED']),
+  "closedMessage": zod.string()
 })
 
 
@@ -98,6 +100,30 @@ export const GetAdminSummaryResponse = zod.object({
   "ideas": zod.number().int(),
   "needsIdea": zod.number().int(),
   "needsMembers": zod.number().int()
+})
+
+
+export const GetRegistrationSettingsResponse = zod.object({
+  "mode": zod.enum(['AUTO', 'OPEN', 'CLOSED']),
+  "deadline": zod.string(),
+  "closedMessage": zod.string(),
+  "open": zod.boolean(),
+  "updatedAt": zod.string().nullable()
+})
+
+
+export const UpdateRegistrationSettingsBody = zod.object({
+  "mode": zod.enum(['AUTO', 'OPEN', 'CLOSED']),
+  "deadline": zod.string(),
+  "closedMessage": zod.string()
+})
+
+export const UpdateRegistrationSettingsResponse = zod.object({
+  "mode": zod.enum(['AUTO', 'OPEN', 'CLOSED']),
+  "deadline": zod.string(),
+  "closedMessage": zod.string(),
+  "open": zod.boolean(),
+  "updatedAt": zod.string().nullable()
 })
 
 

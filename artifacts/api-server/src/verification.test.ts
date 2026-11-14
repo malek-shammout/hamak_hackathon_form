@@ -6,13 +6,14 @@ import assert from "node:assert/strict";
 import ExcelJS from "exceljs";
 import { db, registrations, participants, participantCourses, teams, teamNeeds, projectIdeas, individualPreferences, individualRoles, pool } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { registrationSchema, registrationOpen, DEADLINE, countWords, type RegistrationData } from "./lib/registration-validation";
+import { registrationSchema, DEFAULT_DEADLINE, countWords, type RegistrationData } from "./lib/registration-validation";
+import { isOpen, getRegistrationState } from "./services/settings";
 import { COLLEGES, YEARS, COURSES, NEEDS, ROLES } from "./lib/options";
 import { readRegistrations, removeRegistration, saveRegistration, summarize } from "./services/registrations";
 import { csvExport, excelExport } from "./services/exports";
 
 if (process.env.NODE_ENV === "production") throw new Error("Development verification only");
-const baseUrl = "http://localhost:80/api";
+const baseUrl = process.env.VERIFY_BASE_URL ?? "http://localhost:80/api";
 let checks = 0;
 const check = (condition: unknown, label: string) => { assert.ok(condition, label); checks++; };
 const person = () => ({
@@ -67,15 +68,18 @@ try {
   check(!valid(other), "other college requires detail");
   const otherCourse = input(); otherCourse.applicant.courses = ["دورة أخرى"];
   check(!valid(otherCourse), "other course requires detail");
-  check(registrationOpen(Date.parse(DEADLINE) - 1), "before deadline open");
-  check(!registrationOpen(Date.parse(DEADLINE) + 1), "after deadline closed");
+  check(isOpen("AUTO", DEFAULT_DEADLINE, Date.parse(DEFAULT_DEADLINE) - 1), "before deadline open");
+  check(!isOpen("AUTO", DEFAULT_DEADLINE, Date.parse(DEFAULT_DEADLINE) + 1), "after deadline closed");
+  check(isOpen("OPEN", DEFAULT_DEADLINE, Date.parse(DEFAULT_DEADLINE) + 1), "forced open ignores deadline");
+  check(!isOpen("CLOSED", DEFAULT_DEADLINE, Date.parse(DEFAULT_DEADLINE) - 1), "forced closed ignores deadline");
 
   const config = await fetch(`${baseUrl}/registration-config`);
   check(config.ok, "public config accessible");
-  for (const path of ["/admin/summary", "/admin/registrations", "/admin/registrations/1", "/admin/export/csv", "/admin/export/xlsx"]) {
+  for (const path of ["/admin/summary", "/admin/settings", "/admin/registrations", "/admin/registrations/1", "/admin/export/csv", "/admin/export/xlsx"]) {
     check((await fetch(`${baseUrl}${path}`)).status === 401, `private endpoint ${path}`);
   }
   check((await fetch(`${baseUrl}/admin/registrations/1`, { method: "DELETE" })).status === 401, "unauthorized deletion blocked");
+  check((await fetch(`${baseUrl}/admin/settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "OPEN", deadline: DEFAULT_DEADLINE, closedMessage: "" }) })).status === 401, "unauthorized settings change blocked");
   check((await fetch(`${baseUrl}/admin/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: "not-a-real-password" }) })).status === 403, "login CSRF required");
   const session = await fetch(`${baseUrl}/admin/session`);
   const cookie = session.headers.get("set-cookie")?.split(";")[0] ?? "";
@@ -87,7 +91,7 @@ try {
   });
   check(wrongLogin.status === 401, "incorrect password rejected");
 
-  if (!registrationOpen()) {
+  if (!(await getRegistrationState()).open) {
     const response = await fetch(`${baseUrl}/registrations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input()) });
     check(response.status === 410, "closed API rejects registration");
   } else {

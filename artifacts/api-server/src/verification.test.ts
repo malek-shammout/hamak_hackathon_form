@@ -10,7 +10,7 @@ import { registrationSchema, DEFAULT_DEADLINE, countWords, type RegistrationData
 import { isOpen, getRegistrationState } from "./services/settings";
 import { COLLEGES, YEARS, COURSES, NEEDS, ROLES } from "./lib/options";
 import { readRegistrations, removeRegistration, saveRegistration, summarize } from "./services/registrations";
-import { csvExport, excelExport } from "./services/exports";
+import { csvExport, excelExport, excelExportOne } from "./services/exports";
 
 if (process.env.NODE_ENV === "production") throw new Error("Development verification only");
 const baseUrl = process.env.VERIFY_BASE_URL ?? "http://localhost:80/api";
@@ -75,7 +75,7 @@ try {
 
   const config = await fetch(`${baseUrl}/registration-config`);
   check(config.ok, "public config accessible");
-  for (const path of ["/admin/summary", "/admin/settings", "/admin/registrations", "/admin/registrations/1", "/admin/export/csv", "/admin/export/xlsx"]) {
+  for (const path of ["/admin/summary", "/admin/settings", "/admin/registrations", "/admin/registrations/1/export", "/admin/registrations/1", "/admin/export/csv", "/admin/export/xlsx"]) {
     check((await fetch(`${baseUrl}${path}`)).status === 401, `private endpoint ${path}`);
   }
   check((await fetch(`${baseUrl}/admin/registrations/1`, { method: "DELETE" })).status === 401, "unauthorized deletion blocked");
@@ -114,8 +114,15 @@ try {
     const bytes = await excelExport(selected);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(bytes);
-    check(workbook.worksheets.length === 7, "seven workbook sheets");
-    check(workbook.getWorksheet("Participants")!.rowCount === 13, "all participants exported");
+    check(workbook.worksheets.length === 2 + selected.length, "summary + participants + one sheet per registration");
+    check(workbook.getWorksheet("الطلبات")!.rowCount === 1 + selected.length, "one summary row per registration");
+    check(workbook.getWorksheet("المشاركون")!.rowCount === 13, "all participants exported");
+    const withIdea = selected.find(r => r.idea.status === "HAS_IDEA")!;
+    const summaryText = JSON.stringify(workbook.getWorksheet("الطلبات")!.getSheetValues());
+    check(summaryText.includes(withIdea.idea.title) && summaryText.includes(withIdea.idea.expectedTechnologies), "idea details in summary sheet");
+    const one = new ExcelJS.Workbook();
+    await one.xlsx.load(await excelExportOne(withIdea));
+    check(one.worksheets.length === 1 && JSON.stringify(one.worksheets[0]!.getSheetValues()).includes(withIdea.referenceCode), "single registration workbook");
     const csv = csvExport(selected);
     check(csv.startsWith("\uFEFF") && csv.includes("تجربة اختبار منصة"), "Arabic CSV BOM");
     check(csv.includes("'@hmk_test"), "CSV formula injection protected");

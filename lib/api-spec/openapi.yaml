@@ -143,6 +143,17 @@ paths:
       responses:
         "204":
           description: Deleted
+  /admin/registrations/{id}/export:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+    get:
+      operationId: exportRegistration
+      responses:
+        "200":
+          description: Private Excel download for one registration
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
   /admin/export/{format}:
     get:
       operationId: exportRegistrations

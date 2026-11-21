@@ -251,6 +251,13 @@ export const DeleteRegistrationParams = zod.object({
 export const DeleteRegistrationResponse = zod.void()
 
 
+export const ExportRegistrationParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ExportRegistrationResponse = zod.unknown()
+
+
 export const ExportRegistrationsParams = zod.object({
   "format": zod.enum(['xlsx', 'csv'])
 })

@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { AdminLoginBody, UpdateRegistrationSettingsBody, GetRegistrationParams, DeleteRegistrationParams, ListRegistrationsResponse, GetRegistrationResponse, ExportRegistrationsParams } from "@workspace/api-zod";
 import { csrfToken, requireCsrf, requireAdmin, safeEqual, loginLimiter, sessionMiddleware } from "../middlewares/security";
 import { readRegistrations, removeRegistration, summarize } from "../services/registrations";
-import { csvExport, excelExport } from "../services/exports";
+import { csvExport, excelExport, excelExportOne } from "../services/exports";
 import { getRegistrationState, updateRegistrationSettings } from "../services/settings";
 
 const router: IRouter = Router();
@@ -46,6 +46,13 @@ router.get("/admin/registrations/:id", async (req, res): Promise<void> => {
   const row = (await readRegistrations()).find(r => r.id === params.data.id);
   if (!row) { res.status(404).json({ error: "الطلب غير موجود" }); return; }
   res.json(GetRegistrationResponse.parse(row));
+});
+router.get("/admin/registrations/:id/export", async (req, res): Promise<void> => {
+  const params = GetRegistrationParams.safeParse(req.params);
+  if (!params.success || params.data.id < 1 || !Number.isInteger(params.data.id)) { res.status(400).json({ error: "معرف غير صالح" }); return; }
+  const row = (await readRegistrations()).find(r => r.id === params.data.id);
+  if (!row) { res.status(404).json({ error: "الطلب غير موجود" }); return; }
+  res.attachment(`${row.referenceCode}.xlsx`).type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").send(Buffer.from(await excelExportOne(row)));
 });
 router.delete("/admin/registrations/:id", requireCsrf, async (req, res): Promise<void> => {
   const params = DeleteRegistrationParams.safeParse(req.params);

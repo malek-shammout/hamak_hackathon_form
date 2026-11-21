@@ -867,6 +867,77 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getDeleteRegistrationMutationOptions(options));
     }
 
+export const getExportRegistrationUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/registrations/${id}/export`
+}
+
+export const exportRegistration = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportRegistrationUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportRegistrationQueryKey = (id: number,) => {
+    return [
+    `/api/admin/registrations/${id}/export`
+    ] as const;
+    }
+
+
+export const getExportRegistrationQueryOptions = <TData = Awaited<ReturnType<typeof exportRegistration>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRegistration>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportRegistrationQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportRegistration>>> = ({ signal }) => exportRegistration(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportRegistration>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportRegistrationQueryResult = NonNullable<Awaited<ReturnType<typeof exportRegistration>>>
+export type ExportRegistrationQueryError = ErrorType<unknown>
+
+
+
+export function useExportRegistration<TData = Awaited<ReturnType<typeof exportRegistration>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportRegistration>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportRegistrationQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getExportRegistrationsUrl = (format: 'xlsx' | 'csv',) => {
 
 

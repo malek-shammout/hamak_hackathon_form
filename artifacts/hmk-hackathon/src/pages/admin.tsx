@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  AlertTriangle, Building2, ChevronLeft, FileText, Inbox, Lightbulb, Loader2, RotateCw, Search, Trash2, User, UserPlus, Users, X, Phone, Send,
+  AlertTriangle, Building2, ChevronLeft, ChevronRight, FileSpreadsheet, LayoutList, GalleryHorizontal, FileText, Inbox, Lightbulb, Loader2, RotateCw, Search, Trash2, User, UserPlus, Users, X, Phone, Send,
 } from "lucide-react";
 import type { Registration, Participant } from "@workspace/api-client-react";
 import {
@@ -245,6 +245,106 @@ function FilterBar({ f, set, orgs, mode }: { f: Filters; set: (f: Filters) => vo
   );
 }
 
+/* ---------------- View mode: list vs one-by-one ---------------- */
+type ViewMode = "list" | "browse";
+const VIEW_KEY = "hmk-admin-view";
+function useViewMode(): [ViewMode, (m: ViewMode) => void] {
+  const [mode, setMode] = useState<ViewMode>(() => {
+    try { return localStorage.getItem(VIEW_KEY) === "browse" ? "browse" : "list"; } catch { return "list"; }
+  });
+  const set = useCallback((m: ViewMode) => {
+    setMode(m);
+    try { localStorage.setItem(VIEW_KEY, m); } catch { /* storage unavailable: keep in memory */ }
+  }, []);
+  return [mode, set];
+}
+
+function ViewToggle({ mode, set }: { mode: ViewMode; set: (m: ViewMode) => void }) {
+  const opts = [
+    { v: "list" as const, l: "قائمة", i: LayoutList },
+    { v: "browse" as const, l: "عرض واحداً تلو الآخر", i: GalleryHorizontal },
+  ];
+  return (
+    <div className="inline-flex rounded-xl border bg-card p-1" role="radiogroup" aria-label="طريقة عرض الردود">
+      {opts.map((o) => (
+        <button key={o.v} type="button" role="radio" aria-checked={mode === o.v} onClick={() => set(o.v)} data-testid={`view-${o.v}`}
+          className={cn("inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-bold transition-colors", mode === o.v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+          <o.i className="h-4 w-4" /> {o.l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const isTyping = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
+
+/** Shows one registration at a time with previous / next arrows (also ← → keys). */
+function BrowseView({ rows, onDelete }: { rows: Registration[]; onDelete: (r: Registration) => void }) {
+  const [currentId, setCurrentId] = useState<number | null>(rows[0]?.id ?? null);
+  const top = useRef<HTMLDivElement>(null);
+  const lastIndex = useRef(0);
+  const found = rows.findIndex((r) => r.id === currentId);
+  // If the shown registration was deleted or filtered out, stay at the same position.
+  const i = found === -1 ? Math.min(lastIndex.current, rows.length - 1) : found;
+  lastIndex.current = Math.max(0, i);
+  const r = rows[i];
+  const go = useCallback((n: number) => {
+    const next = rows[Math.max(0, Math.min(rows.length - 1, n))];
+    if (!next) return;
+    setCurrentId(next.id);
+    top.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [rows]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTyping(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
+      // RTL: the right arrow goes back, the left arrow goes forward.
+      if (e.key === "ArrowLeft") { e.preventDefault(); go(i + 1); }
+      if (e.key === "ArrowRight") { e.preventDefault(); go(i - 1); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go, i]);
+
+  if (!r) return null;
+  const btn = "inline-flex h-10 items-center gap-1.5 rounded-xl border bg-card px-3 text-sm font-bold transition-colors hover:border-primary/40 hover:text-primary disabled:pointer-events-none disabled:opacity-40";
+  return (
+    <div className="space-y-5">
+      <div ref={top} className="scroll-mt-32" />
+      <div className="sticky top-[7.25rem] z-30 rounded-2xl border bg-card/95 p-2 shadow-sm backdrop-blur sm:p-3" data-testid="browse-bar">
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => go(i - 1)} disabled={i === 0} className={btn} aria-label="الطلب السابق" data-testid="button-browse-prev">
+            <ChevronRight className="h-4 w-4" /> <span className="hidden sm:inline">السابق</span>
+          </button>
+          <select value={r.id} onChange={(e) => go(rows.findIndex((x) => x.id === Number(e.target.value)))} aria-label="الانتقال إلى طلب"
+            className="h-10 min-w-0 flex-1 rounded-xl border bg-background px-3 text-sm font-medium focus:border-primary focus:outline-none" data-testid="select-browse-jump">
+            {rows.map((x, n) => <option key={x.id} value={x.id}>{n + 1}. {x.team?.name ?? x.applicant.fullNameAr} · {x.referenceCode}</option>)}
+          </select>
+          <span className="hidden shrink-0 font-pixel text-sm tabular-nums text-muted-foreground sm:inline" dir="ltr" data-testid="text-browse-position">{i + 1} / {rows.length}</span>
+          <button type="button" onClick={() => go(i + 1)} disabled={i === rows.length - 1} className={btn} aria-label="الطلب التالي" data-testid="button-browse-next">
+            <span className="hidden sm:inline">التالي</span> <ChevronLeft className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${((i + 1) / rows.length) * 100}%` }} /></div>
+      </div>
+      <motion.div key={r.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <h2 className="text-xl font-black">{r.team?.name ?? r.applicant.fullNameAr}</h2>
+          <Pill tone="red">{PARTICIPATION_LABEL[r.participationType]}</Pill>
+          <Pill tone={r.idea.status === "HAS_IDEA" ? "ok" : "warn"}>{IDEA_LABEL[r.idea.status]}</Pill>
+          <Link to={`/admin-hmk/registrations/${r.id}`} className="mr-auto text-xs text-primary hover:underline" data-testid="link-browse-open">فتح في صفحة مستقلة</Link>
+        </div>
+        <RegistrationView r={r} onDelete={() => onDelete(r)} stickyAside={false} />
+      </motion.div>
+      <div className="flex justify-between gap-2 border-t pt-5">
+        <button type="button" onClick={() => go(i - 1)} disabled={i === 0} className={btn}><ChevronRight className="h-4 w-4" /> السابق</button>
+        <span className="self-center text-xs text-muted-foreground">استخدم مفاتيح الأسهم ← → للتنقل</span>
+        <button type="button" onClick={() => go(i + 1)} disabled={i === rows.length - 1} className={btn}>التالي <ChevronLeft className="h-4 w-4" /></button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Registrations ---------------- */
 export function AdminRegistrations() {
   usePageMeta("التسجيلات | لوحة منظمي هاكاثون الهمك");
@@ -263,6 +363,7 @@ function RegistrationsBody() {
   const nav = useNavigate();
   const [f, setF] = useState<Filters>(emptyFilters);
   const [toDelete, setToDelete] = useState<Registration | null>(null);
+  const [mode, setMode] = useViewMode();
   const data = useMemo(() => (list.data ?? []).slice().sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)), [list.data]);
   const orgs = useMemo(() => Array.from(new Set(data.map((r) => r.externalOrganizationName).filter(Boolean) as string[])).sort(), [data]);
   const rows = useMemo(() => applyFilters(data, f), [data, f]);
@@ -270,11 +371,16 @@ function RegistrationsBody() {
   return (
     <div className="space-y-5">
       <FilterBar f={f} set={setF} orgs={orgs} mode="all" />
-      <div className="text-sm text-muted-foreground" data-testid="text-result-count">{rows.length} من {data.length} طلب</div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm text-muted-foreground" data-testid="text-result-count">{rows.length} من {data.length} طلب</div>
+        <ViewToggle mode={mode} set={setMode} />
+      </div>
       {list.isLoading ? <SkeletonRows /> : list.isError ? <ErrorBox onRetry={() => list.refetch()} /> : data.length === 0 ? (
         <EmptyBox title="لا توجد تسجيلات بعد" desc="عند وصول أول طلب سيظهر هنا." />
       ) : rows.length === 0 ? (
         <EmptyBox title="لا نتائج مطابقة" desc="جرّب تعديل البحث أو مسح الفلاتر." />
+      ) : mode === "browse" ? (
+        <BrowseView rows={rows} onDelete={setToDelete} />
       ) : (
         <>
           {/* desktop table */}
@@ -352,16 +458,22 @@ function IndividualsBody() {
   const list = useRegistrations(authed);
   const [f, setF] = useState<Filters>(emptyFilters);
   const [toDelete, setToDelete] = useState<Registration | null>(null);
+  const [mode, setMode] = useViewMode();
   const data = useMemo(() => (list.data ?? []).filter((r) => r.participationType === "INDIVIDUAL").sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)), [list.data]);
   const rows = useMemo(() => applyFilters(data, f), [data, f]);
   return (
     <div className="space-y-5">
       <p className="max-w-2xl text-sm leading-7 text-muted-foreground">استعراض وفرز فقط، لتسهيل تشكيل الفرق لاحقاً خارج المنصة.</p>
       <FilterBar f={f} set={setF} orgs={[]} mode="individuals" />
-      <div className="text-sm text-muted-foreground">{rows.length} من {data.length} مشارك</div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm text-muted-foreground">{rows.length} من {data.length} مشارك</div>
+        <ViewToggle mode={mode} set={setMode} />
+      </div>
       {list.isLoading ? <SkeletonRows /> : list.isError ? <ErrorBox onRetry={() => list.refetch()} /> : data.length === 0 ? (
         <EmptyBox title="لا يوجد مشاركون منفردون بعد" desc="سيظهر هنا كل من يسجّل كفرد." />
-      ) : rows.length === 0 ? <EmptyBox title="لا نتائج مطابقة" desc="جرّب تعديل البحث أو مسح الفلاتر." /> : (
+      ) : rows.length === 0 ? <EmptyBox title="لا نتائج مطابقة" desc="جرّب تعديل البحث أو مسح الفلاتر." /> : mode === "browse" ? (
+        <BrowseView rows={rows} onDelete={setToDelete} />
+      ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {rows.map((r) => {
             const p = r.applicant;
@@ -449,6 +561,84 @@ function PersonCard({ p, role, idx }: { p: Participant; role: string; idx: numbe
   );
 }
 
+/** Full details of one registration. Shared by the detail page and the one-by-one browser. */
+function RegistrationView({ r, onDelete, stickyAside = true }: { r: Registration; onDelete: () => void; stickyAside?: boolean }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="space-y-6">
+        {r.team && (
+          <section className="rounded-2xl border bg-card p-5 sm:p-6">
+            <h2 className="mb-4 font-extrabold">بيانات الفريق</h2>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div><div className="text-xs text-muted-foreground">اسم الفريق</div><div className="mt-1 font-bold">{r.team.name}</div></div>
+              <div><div className="text-xs text-muted-foreground">عدد الأعضاء</div><div className="mt-1 font-pixel text-xl">{r.team.totalMembers}</div></div>
+              <div><div className="text-xs text-muted-foreground">الجهة</div><div className="mt-1">{AFFILIATION_LABEL[r.affiliationType]}{r.externalOrganizationName ? ` · ${r.externalOrganizationName}` : ""}</div></div>
+            </div>
+            <div className="mt-5">
+              <div className="text-xs text-muted-foreground">احتياجات الفريق</div>
+              <div className="mt-2 flex flex-wrap gap-1.5">{r.team.needs.map((n) => <Pill key={n} tone={n === NEED_COMPLETE ? "ok" : "red"}>{n}</Pill>)}</div>
+            </div>
+          </section>
+        )}
+        {r.preferences && (
+          <section className="rounded-2xl border bg-card p-5 sm:p-6">
+            <h2 className="mb-4 font-extrabold">تفضيلات المشارك المنفرد</h2>
+            <div className="flex flex-wrap gap-1.5">{r.preferences.roles.map((x) => <Pill key={x} tone="red">{x}</Pill>)}</div>
+            <div className="mt-4 text-sm"><span className="text-muted-foreground">صديق يرغب بالعمل معه: </span>{r.preferences.friendName || "—"}</div>
+          </section>
+        )}
+        <section>
+          <h2 className="mb-3 font-extrabold">{r.team ? `الأشخاص (${people(r).length})` : "بيانات المشارك"}</h2>
+          <div className="grid gap-3 xl:grid-cols-2">
+            {people(r).map((p, i) => <PersonCard key={i} p={p} idx={i} role={i === 0 ? (r.team ? "قائد الفريق" : "مشارك منفرد") : `عضو ${i + 1}`} />)}
+          </div>
+        </section>
+        <section className="rounded-2xl border bg-card p-5 sm:p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-extrabold">فكرة المشروع</h2>
+            <Pill tone={r.idea.status === "HAS_IDEA" ? "ok" : "warn"}>{IDEA_LABEL[r.idea.status]}</Pill>
+          </div>
+          {r.idea.status === "HAS_IDEA" ? (
+            <div className="space-y-4">
+              <div><div className="text-xs text-muted-foreground">العنوان</div><div className="mt-1 text-lg font-bold">{r.idea.title}</div></div>
+              <div><div className="text-xs text-muted-foreground">نوع المشروع</div><div className="mt-1">{projectTypeLabel(r.idea.projectType)}</div></div>
+              <div><div className="text-xs text-muted-foreground">الملخص</div><p className="mt-1 whitespace-pre-line leading-8">{r.idea.description}</p></div>
+              <div><div className="text-xs text-muted-foreground">القطع والتقنيات المتوقعة</div><p className="mt-1 whitespace-pre-line leading-7">{r.idea.expectedTechnologies}</p></div>
+            </div>
+          ) : <p className="text-sm text-muted-foreground">لم يقدّم فكرة. يحتاج إلى مساعدة النادي في اختيار أو تطوير فكرة مناسبة.</p>}
+        </section>
+      </div>
+      <aside className={cn("space-y-4", stickyAside && "lg:sticky lg:top-32 lg:self-start")}>
+        <div className="relative overflow-hidden rounded-2xl bg-ink p-5 text-ink-foreground">
+          <div className="pixel-grid absolute inset-0" />
+          <div className="relative">
+            <div className="text-xs text-white/55">الرقم المرجعي</div>
+            <div dir="ltr" className="mt-1 text-right font-pixel text-xl" data-testid="text-detail-reference">{r.referenceCode}</div>
+            <div className="mt-4 grid gap-2 text-sm">
+              <div className="flex justify-between"><span className="text-white/55">نوع الجهة</span><span>{AFFILIATION_LABEL[r.affiliationType]}</span></div>
+              <div className="flex justify-between"><span className="text-white/55">المشاركة</span><span>{PARTICIPATION_LABEL[r.participationType]}</span></div>
+              <div className="flex justify-between gap-2"><span className="text-white/55">التاريخ</span><span className="text-xs">{fmtDate(r.createdAt)}</span></div>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-2xl border bg-card p-5 text-sm">
+          <div className="font-bold">التعهدات</div>
+          <div className="mt-3 space-y-2 text-muted-foreground">
+            <div className="flex justify-between"><span>ورشة التفكير التصميمي</span><span className={r.termsWorkshopAccepted ? "text-success" : "text-destructive"}>{r.termsWorkshopAccepted ? "موافق" : "لا"}</span></div>
+            <div className="flex justify-between"><span>الحفاظ على المعدات</span><span className={r.termsEquipmentAccepted ? "text-success" : "text-destructive"}>{r.termsEquipmentAccepted ? "موافق" : "لا"}</span></div>
+          </div>
+        </div>
+        <a href={`/api/admin/registrations/${r.id}/export`} download className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border bg-card text-sm font-bold hover:border-primary/40" data-testid="link-export-one">
+          <FileSpreadsheet className="h-4 w-4 text-success" /> تنزيل هذا الطلب Excel
+        </a>
+        <button onClick={onDelete} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-destructive/40 text-sm font-bold text-destructive hover:bg-destructive/5" data-testid="button-delete-detail">
+          <Trash2 className="h-4 w-4" /> حذف الطلب بالكامل
+        </button>
+      </aside>
+    </div>
+  );
+}
+
 function DetailBody() {
   const { id } = useParams();
   const num = Number(id);
@@ -467,75 +657,7 @@ function DetailBody() {
       {q.isLoading ? <SkeletonRows /> : q.isError || !r ? (
         <ErrorBox onRetry={() => q.refetch()} msg={(q.error as { status?: number } | null)?.status === 404 ? "الطلب غير موجود أو تم حذفه" : undefined} />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-          <div className="space-y-6">
-            {r.team && (
-              <section className="rounded-2xl border bg-card p-5 sm:p-6">
-                <h2 className="mb-4 font-extrabold">بيانات الفريق</h2>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div><div className="text-xs text-muted-foreground">اسم الفريق</div><div className="mt-1 font-bold">{r.team.name}</div></div>
-                  <div><div className="text-xs text-muted-foreground">عدد الأعضاء</div><div className="mt-1 font-pixel text-xl">{r.team.totalMembers}</div></div>
-                  <div><div className="text-xs text-muted-foreground">الجهة</div><div className="mt-1">{AFFILIATION_LABEL[r.affiliationType]}{r.externalOrganizationName ? ` · ${r.externalOrganizationName}` : ""}</div></div>
-                </div>
-                <div className="mt-5">
-                  <div className="text-xs text-muted-foreground">احتياجات الفريق</div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">{r.team.needs.map((n) => <Pill key={n} tone={n === NEED_COMPLETE ? "ok" : "red"}>{n}</Pill>)}</div>
-                </div>
-              </section>
-            )}
-            {r.preferences && (
-              <section className="rounded-2xl border bg-card p-5 sm:p-6">
-                <h2 className="mb-4 font-extrabold">تفضيلات المشارك المنفرد</h2>
-                <div className="flex flex-wrap gap-1.5">{r.preferences.roles.map((x) => <Pill key={x} tone="red">{x}</Pill>)}</div>
-                <div className="mt-4 text-sm"><span className="text-muted-foreground">صديق يرغب بالعمل معه: </span>{r.preferences.friendName || "—"}</div>
-              </section>
-            )}
-            <section>
-              <h2 className="mb-3 font-extrabold">{r.team ? `الأشخاص (${people(r).length})` : "بيانات المشارك"}</h2>
-              <div className="grid gap-3 xl:grid-cols-2">
-                {people(r).map((p, i) => <PersonCard key={i} p={p} idx={i} role={i === 0 ? (r.team ? "قائد الفريق" : "مشارك منفرد") : `عضو ${i + 1}`} />)}
-              </div>
-            </section>
-            <section className="rounded-2xl border bg-card p-5 sm:p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-extrabold">فكرة المشروع</h2>
-                <Pill tone={r.idea.status === "HAS_IDEA" ? "ok" : "warn"}>{IDEA_LABEL[r.idea.status]}</Pill>
-              </div>
-              {r.idea.status === "HAS_IDEA" ? (
-                <div className="space-y-4">
-                  <div><div className="text-xs text-muted-foreground">العنوان</div><div className="mt-1 text-lg font-bold">{r.idea.title}</div></div>
-                  <div><div className="text-xs text-muted-foreground">نوع المشروع</div><div className="mt-1">{projectTypeLabel(r.idea.projectType)}</div></div>
-                  <div><div className="text-xs text-muted-foreground">الملخص</div><p className="mt-1 whitespace-pre-line leading-8">{r.idea.description}</p></div>
-                  <div><div className="text-xs text-muted-foreground">القطع والتقنيات المتوقعة</div><p className="mt-1 whitespace-pre-line leading-7">{r.idea.expectedTechnologies}</p></div>
-                </div>
-              ) : <p className="text-sm text-muted-foreground">لم يقدّم فكرة. يحتاج إلى مساعدة النادي في اختيار أو تطوير فكرة مناسبة.</p>}
-            </section>
-          </div>
-          <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
-            <div className="relative overflow-hidden rounded-2xl bg-ink p-5 text-ink-foreground">
-              <div className="pixel-grid absolute inset-0" />
-              <div className="relative">
-                <div className="text-xs text-white/55">الرقم المرجعي</div>
-                <div dir="ltr" className="mt-1 text-right font-pixel text-xl" data-testid="text-detail-reference">{r.referenceCode}</div>
-                <div className="mt-4 grid gap-2 text-sm">
-                  <div className="flex justify-between"><span className="text-white/55">نوع الجهة</span><span>{AFFILIATION_LABEL[r.affiliationType]}</span></div>
-                  <div className="flex justify-between"><span className="text-white/55">المشاركة</span><span>{PARTICIPATION_LABEL[r.participationType]}</span></div>
-                  <div className="flex justify-between gap-2"><span className="text-white/55">التاريخ</span><span className="text-xs">{fmtDate(r.createdAt)}</span></div>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-2xl border bg-card p-5 text-sm">
-              <div className="font-bold">التعهدات</div>
-              <div className="mt-3 space-y-2 text-muted-foreground">
-                <div className="flex justify-between"><span>ورشة التفكير التصميمي</span><span className={r.termsWorkshopAccepted ? "text-success" : "text-destructive"}>{r.termsWorkshopAccepted ? "موافق" : "لا"}</span></div>
-                <div className="flex justify-between"><span>الحفاظ على المعدات</span><span className={r.termsEquipmentAccepted ? "text-success" : "text-destructive"}>{r.termsEquipmentAccepted ? "موافق" : "لا"}</span></div>
-              </div>
-            </div>
-            <button onClick={() => setDel(true)} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-destructive/40 text-sm font-bold text-destructive hover:bg-destructive/5" data-testid="button-delete-detail">
-              <Trash2 className="h-4 w-4" /> حذف الطلب بالكامل
-            </button>
-          </aside>
-        </div>
+        <RegistrationView r={r} onDelete={() => setDel(true)} />
       )}
       <DeleteDialog reg={r ?? null} open={del} onOpenChange={setDel} onDeleted={() => nav(back, { replace: true })} />
     </AdminLayout>
